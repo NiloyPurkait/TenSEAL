@@ -405,6 +405,7 @@ void bind_ckks_vector(py::module &m) {
                 size_t row_size) {
                  return obj->enc_matmul_plain_inplace(matrix, row_size);
              })
+        .def("bootstrap", &CKKSVector::bootstrap, "Refresh ciphertext to reduce noise using bootstrapping")
         // python arithmetic
         .def("__neg__", &CKKSVector::negate)
         .def("__pow__", &CKKSVector::power)
@@ -478,14 +479,6 @@ void bind_ckks_vector(py::module &m) {
              [](shared_ptr<CKKSVector> obj, const vector<double> &other) {
                  return obj->mul_plain(other);
              })
-        .def("__imul__", &CKKSVector::mul_inplace)
-        .def("__imul__",
-             py::overload_cast<const double &>(&CKKSVector::mul_plain_inplace))
-        .def("__imul__",
-             [](shared_ptr<CKKSVector> obj, const vector<double> &other) {
-                 return obj->mul_plain_inplace(other);
-             })
-        .def("__matmul__", &CKKSVector::matmul_plain)
         .def("__imatmul__", &CKKSVector::matmul_plain_inplace)
         .def("context", &CKKSVector::tenseal_context)
         .def("link_context", &CKKSVector::link_tenseal_context)
@@ -648,59 +641,15 @@ void bind_ckks_tensor(py::module &m) {
                              &CKKSTensor::mul_plain, py::const_))
         .def("__rmul__", py::overload_cast<const PlainTensor<double> &>(
                              &CKKSTensor::mul_plain, py::const_))
-        .def("__imul__", &CKKSTensor::mul_inplace)
-        .def("__imul__",
-             py::overload_cast<const double &>(&CKKSTensor::mul_plain_inplace))
-        .def("__imul__", py::overload_cast<const PlainTensor<double> &>(
-                             &CKKSTensor::mul_plain_inplace))
-        .def("__matmul__", &CKKSTensor::matmul)
-        .def("__matmul__", &CKKSTensor::matmul_plain)
-        .def("__imatmul__", &CKKSTensor::matmul_inplace)
         .def("__imatmul__", &CKKSTensor::matmul_plain_inplace)
-        .def("__sub__", &CKKSTensor::sub)
-        .def("__sub__", py::overload_cast<const double &>(
-                            &CKKSTensor::sub_plain, py::const_))
-        .def("__sub__", py::overload_cast<const PlainTensor<double> &>(
-                            &CKKSTensor::sub_plain, py::const_))
-        /*
-        Since subtraction operation is anticommutative, right subtraction
-        operator need to negate the vector then do an addition with left
-        operand.
-        */
-        .def("__rsub__",
-             [](shared_ptr<CKKSTensor> other, const double left_operand) {
-                 // vec should be a copy so it might be safe to do inplace
-                 auto vec = other->copy();
-                 vec->negate_inplace();
-                 vec->add_plain_inplace(left_operand);
-                 return vec;
-             })
-        .def("__rsub__",
-             [](shared_ptr<CKKSTensor> other,
-                const vector<double> &left_operand) {
-                 // vec should be a copy so it might be safe to do inplace
-                 auto vec = other->copy();
-                 vec->negate_inplace();
-                 vec->add_plain_inplace(left_operand);
-                 return vec;
-             })
-        .def("subscript", &CKKSTensor::subscript)
-        .def("__isub__", &CKKSTensor::sub_inplace)
-        .def("__isub__",
-             py::overload_cast<const double &>(&CKKSTensor::sub_plain_inplace))
-        .def("__isub__", py::overload_cast<const PlainTensor<double> &>(
-                             &CKKSTensor::sub_plain_inplace))
-        .def("__neg__", &CKKSTensor::negate)
-        .def("__pow__", &CKKSTensor::power)
-        .def("__ipow__", &CKKSTensor::power_inplace)
         .def("context", &CKKSTensor::tenseal_context)
         .def("link_context", &CKKSTensor::link_tenseal_context)
         .def("serialize",
              [](shared_ptr<CKKSTensor> &obj) { return py::bytes(obj->save()); })
         .def("copy", &CKKSTensor::deepcopy)
         .def("__copy__",
-             [](shared_ptr<CKKSTensor> &obj) { return obj->deepcopy(); })
-        .def("__deepcopy__", [](const shared_ptr<CKKSTensor> &obj,
+             [](shared_ptr<CKKSTensor> obj) { return obj->deepcopy(); })
+        .def("__deepcopy__", [](shared_ptr<CKKSTensor> obj,
                                 py::dict) { return obj->deepcopy(); })
         .def("ciphertext", &CKKSTensor::data)
         .def("shape", &CKKSTensor::shape)
@@ -817,50 +766,7 @@ void bind_bfv_tensor(py::module &m) {
                              &BFVTensor::mul_plain, py::const_))
         .def("__rmul__", py::overload_cast<const PlainTensor<int64_t> &>(
                              &BFVTensor::mul_plain, py::const_))
-        .def("__imul__", &BFVTensor::mul_inplace)
-        .def("__imul__",
-             py::overload_cast<const int64_t &>(&BFVTensor::mul_plain_inplace))
-        .def("__imul__", py::overload_cast<const PlainTensor<int64_t> &>(
-                             &BFVTensor::mul_plain_inplace))
-        .def("__matmul__", &BFVTensor::matmul)
-        .def("__matmul__", &BFVTensor::matmul_plain)
-        .def("__imatmul__", &BFVTensor::matmul_inplace)
         .def("__imatmul__", &BFVTensor::matmul_plain_inplace)
-        .def("__sub__", &BFVTensor::sub)
-        .def("__sub__", py::overload_cast<const int64_t &>(
-                            &BFVTensor::sub_plain, py::const_))
-        .def("__sub__", py::overload_cast<const PlainTensor<int64_t> &>(
-                            &BFVTensor::sub_plain, py::const_))
-        /*
-        Since subtraction operation is anticommutative, right subtraction
-        operator need to negate the vector then do an addition with left
-        operand.
-        */
-        .def("__rsub__",
-             [](shared_ptr<BFVTensor> other, const int64_t left_operand) {
-                 // vec should be a copy so it might be safe to do inplace
-                 auto vec = other->copy();
-                 vec->negate_inplace();
-                 vec->add_plain_inplace(left_operand);
-                 return vec;
-             })
-        .def("__rsub__",
-             [](shared_ptr<BFVTensor> other,
-                const vector<int64_t> &left_operand) {
-                 // vec should be a copy so it might be safe to do inplace
-                 auto vec = other->copy();
-                 vec->negate_inplace();
-                 vec->add_plain_inplace(left_operand);
-                 return vec;
-             })
-        .def("__isub__", &BFVTensor::sub_inplace)
-        .def("__isub__",
-             py::overload_cast<const int64_t &>(&BFVTensor::sub_plain_inplace))
-        .def("__isub__", py::overload_cast<const PlainTensor<int64_t> &>(
-                             &BFVTensor::sub_plain_inplace))
-        .def("__neg__", &BFVTensor::negate)
-        .def("__pow__", &BFVTensor::power)
-        .def("__ipow__", &BFVTensor::power_inplace)
         .def("context", &BFVTensor::tenseal_context)
         .def("link_context", &BFVTensor::link_tenseal_context)
         .def("serialize",

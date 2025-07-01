@@ -1,4 +1,5 @@
 #include "tenseal/cpp/tensors/ckksvector.h"
+#include "seal/seal.h"
 
 using namespace seal;
 using namespace std;
@@ -639,6 +640,12 @@ shared_ptr<CKKSVector> CKKSVector::deepcopy() const {
         /*save_galois_keys=*/true, /*save_relin_keys=*/true);
     CKKSVectorProto vec = this->save_proto();
     return CKKSVector::Create(ctx, vec);
+}
+
+void CKKSVector::bootstrap() {
+    // Assumes you have a method to get the SEALContext and Ciphertext
+    seal::Evaluator evaluator(*this->tenseal_context()->seal_context());
+    evaluator.bootstrap_inplace(this->ciphertext());
 }
 
 }  // namespace tenseal

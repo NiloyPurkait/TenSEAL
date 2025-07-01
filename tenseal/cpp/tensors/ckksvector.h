@@ -120,6 +120,8 @@ class CKKSVector
 
     double scale() const override { return _init_scale; }
 
+    void bootstrap();
+
    private:
     double _init_scale;
     /*

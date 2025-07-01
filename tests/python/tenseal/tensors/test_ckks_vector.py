@@ -341,40 +341,6 @@ def test_radd_plain(context, vec1, vec2, precision):
         ([1, 2, 3, 4], -2),
     ],
 )
-def test_add_plain_inplace(context, vec1, vec2, precision):
-    first_vec = ts.ckks_vector(context, vec1)
-    second_vec = vec2
-    first_vec += second_vec
-    if isinstance(vec2, list):
-        expected = [v1 + v2 for v1, v2 in zip(vec1, vec2)]
-    elif isinstance(vec2, (float, int)):
-        expected = [v1 + vec2 for v1 in vec1]
-
-    # Decryption
-    decrypted_result = first_vec.decrypt()
-    assert _almost_equal(decrypted_result, expected, precision), "Addition of vectors is incorrect."
-
-
-@pytest.mark.parametrize(
-    "vec1, vec2",
-    [
-        ([0], [0]),
-        ([1], [0]),
-        ([-1], [0]),
-        ([-1], [-1]),
-        ([1], [1]),
-        ([-1], [1]),
-        ([1, 2, 3, 4], [4, 3, 2, 1]),
-        ([-1, -2], [-73, -10]),
-        ([1, 2], [-73, -10]),
-        ([1, 2, 3, 4], [2]),
-        ([1, 0, -2, 73], [-5]),
-        ([1, 2, 3, 4, 5], [1]),
-        ([1, 0, -2, 0, -8, 4, 73], [81]),
-        ([2 * i for i in range(100000)], [81]),
-        ([2 * i for i in range(100000)], [3 * i for i in range(100000)]),
-    ],
-)
 def test_sub(context, vec1, vec2, precision):
     first_vec = ts.ckks_vector(context, vec1)
     second_vec = ts.ckks_vector(context, vec2)
@@ -502,39 +468,6 @@ def test_rsub_plain(context, vec1, vec2, precision):
         decrypted_result, expected, precision
     ), "Substraction of vectors is incorrect."
     assert _almost_equal(first_vec.decrypt(), vec1, precision), "Something went wrong in memory."
-
-
-@pytest.mark.parametrize(
-    "vec1, vec2",
-    [
-        ([0], [0]),
-        ([1], [0]),
-        ([-1], [0]),
-        ([-1], [-1]),
-        ([1], [1]),
-        ([-1], [1]),
-        ([1, 2, 3, 4], [4, 3, 2, 1]),
-        ([-1, -2], [-73, -10]),
-        ([1, 2], [-73, -10]),
-        ([1, 2, 3, 4], 2),
-        ([1, 2, 3, 4], 0),
-        ([1, 2, 3, 4], -2),
-    ],
-)
-def test_sub_plain_inplace(context, vec1, vec2, precision):
-    first_vec = ts.ckks_vector(context, vec1)
-    second_vec = vec2
-    first_vec -= second_vec
-    if isinstance(vec2, list):
-        expected = [v1 - v2 for v1, v2 in zip(vec1, vec2)]
-    elif isinstance(vec2, (float, int)):
-        expected = [v1 - vec2 for v1 in vec1]
-
-    # Decryption
-    decrypted_result = first_vec.decrypt()
-    assert _almost_equal(
-        decrypted_result, expected, precision
-    ), "Substraction of vectors is incorrect."
 
 
 @pytest.mark.parametrize(
@@ -698,9 +631,12 @@ def test_rmul_plain(context, vec1, vec2, precision):
         ([1, 2, 3, 4], [4, 3, 2, 1]),
         ([-1, -2], [-73, -10]),
         ([1, 2], [-73, -10]),
-        ([1, 2, 3, 4], 2),
-        ([1, 2, 3, 4], 0),
-        ([1, 2, 3, 4], -2),
+        ([1, 2, 3, 4], [2]),
+        ([1, 0, -2, 73], [-5]),
+        ([1, 2, 3, 4, 5], [1]),
+        ([1, 0, -2, 0, -8, 4, 73], [81]),
+        ([2 for i in range(100000)], [3]),
+        ([2 for i in range(10000)], [3 for i in range(10000)]),
     ],
 )
 def test_mul_plain_inplace(context, vec1, vec2, precision):
@@ -1288,3 +1224,15 @@ def test_shape(context):
     for size in range(1, 10):
         vec = ts.ckks_vector(context, [1] * size)
         assert vec.shape == [size], "Shape of encrypted vector is incorrect."
+
+
+def test_bootstrap_ckksvector():
+    import tenseal as ts
+    context = ts.context(ts.SCHEME_TYPE.CKKS, poly_modulus_degree=8192, coeff_mod_bit_sizes=[60, 40, 40, 60])
+    context.generate_galois_keys()
+    vec = ts.ckks_vector(context, [1.0, 2.0, 3.0])
+    for _ in range(5):
+        vec = vec * 1.01
+    vec.bootstrap()
+    decrypted = vec.decrypt()
+    assert all(abs(a - b) < 0.1 for a, b in zip(decrypted, [1.0 * 1.01**5, 2.0 * 1.01**5, 3.0 * 1.01**5]))

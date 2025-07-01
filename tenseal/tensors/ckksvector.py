@@ -211,3 +211,9 @@ class CKKSVector(AbstractTensor):
         other = self._enc_matmul_plain(other)
         self.data.enc_matmul_plain_(other, row_size)
         return self
+
+    def bootstrap(self):
+        """
+        Refresh the ciphertext to reduce noise using bootstrapping.
+        """
+        self.data.bootstrap()
